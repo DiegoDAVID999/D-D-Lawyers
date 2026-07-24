@@ -3,10 +3,61 @@ import { site } from "../data/content"
 
 export default function Contact() {
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitted(true)
+    setLoading(true)
+    setError(null)
+
+    const accessKey = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY
+    if (!accessKey) {
+      setError(
+        "El formulario aún no está activado. Escríbenos por WhatsApp o al correo indicado."
+      )
+      setLoading(false)
+      return
+    }
+
+    const formData = new FormData(e.target)
+    const area = formData.get("area")
+
+    try {
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          access_key: accessKey,
+          name: formData.get("nombre"),
+          email: formData.get("email"),
+          phone: formData.get("telefono") || "No indicado",
+          subject: `Nueva consulta — ${area || "General"} — D&D Lawyers`,
+          message: formData.get("mensaje"),
+          from_name: "D&D Lawyers — Sitio web",
+          replyto: formData.get("email"),
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setSubmitted(true)
+        return
+      }
+
+      setError(
+        data.message ||
+          "No se pudo enviar el mensaje. Intenta por WhatsApp o correo."
+      )
+    } catch {
+      setError("Error de conexión. Intenta por WhatsApp o correo directo.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -279,10 +330,17 @@ export default function Contact() {
 
                 <button
                   type="submit"
-                  className="mt-6 w-full rounded-sm bg-gold py-3.5 text-sm font-semibold tracking-wide text-navy-900 transition-all hover:bg-gold-light"
+                  disabled={loading}
+                  className="mt-6 w-full rounded-sm bg-gold py-3.5 text-sm font-semibold tracking-wide text-navy-900 transition-all hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Enviar consulta
+                  {loading ? "Enviando..." : "Enviar consulta"}
                 </button>
+
+                {error && (
+                  <p className="mt-4 text-center text-sm text-red-300/90">
+                    {error}
+                  </p>
+                )}
 
                 <p className="mt-4 text-center text-xs text-white/30">
                   Tus datos están protegidos y no serán compartidos con terceros.
